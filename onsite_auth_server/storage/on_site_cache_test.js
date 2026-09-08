@@ -6,7 +6,7 @@ const randomMockCard = () => {
   return {
     uid: oid(),
     holder: Math.round(Math.random()) ? 'Alice' : 'Bob',
-    expiry: new Date().getTime(),
+    expiry: new Date().getTime() + 3600000,
     validity: Math.round(Math.random()) ? 'activeMember' : 'lostCard',
   };
 };
@@ -15,7 +15,7 @@ const acceptedCard = () => {
   return {
     uid: oid(),
     holder: Math.round(Math.random()) ? 'Alice' : 'Bob',
-    expiry: new Date().getTime(),
+    expiry: new Date().getTime() + 3600000,
     validity: 'activeMember',
   }
 }
@@ -66,6 +66,10 @@ const runCacheTest = async () => {
       throw new Error(`cache setup is not a thing`);
     }
     await createCards(cards);
+    const rewroteIdenticalCard = await updateCard(cards[0]);
+    if (rewroteIdenticalCard) {
+      throw new Error(`Identical card data should not be rewritten`);
+    }
     let foundCard = await checkForCard(cards[0].uid);
     if (foundCard) {
       console.log(`found loaded card ${JSON.stringify(foundCard)}`);

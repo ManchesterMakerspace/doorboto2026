@@ -9,6 +9,7 @@ module.exports = {
       DOORBOTO_WEBHOOK: process.env.DOORBOTO_WEBHOOK,
       MR_WEBHOOK: process.env.MR_WEBHOOK,
       ARDUINO_PORT: process.env.ARDUINO_PORT,
+      LENIENCY: process.env.LENIENCY,
     },
     env_testing: {
       MONGODB_URI: '',
@@ -16,6 +17,7 @@ module.exports = {
       DOORBOTO_WEBHOOK: '',
       MR_WEBHOOK: '',
       ARDUINO_PORT: '',
+      LENIENCY: '',
     }
   }]
 };

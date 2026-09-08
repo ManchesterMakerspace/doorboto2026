@@ -3,6 +3,7 @@ const { runCacheTest } = require('../storage/on_site_cache_test.js');
 const { 
   noValidDbTest,
   itUnderstandsBadStanding,
+  itDisablesLeniencyByDefault,
   itUnderstandsGoodStanding,
 } = require('../doorboto_test.js');
 
@@ -10,6 +11,7 @@ const runThemAll = async () => {
   try {
     itUnderstandsGoodStanding();
     itUnderstandsBadStanding();
+    itDisablesLeniencyByDefault();
     await runCacheTest();
     await noValidDbTest();
     process.exit(0);
@@ -22,6 +24,7 @@ const runOne = async () => {
   try {
     itUnderstandsGoodStanding();
     itUnderstandsBadStanding();
+    itDisablesLeniencyByDefault();
     // await runCacheTest();
     // await noValidDbTest();
     // process.exit(0);

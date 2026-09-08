@@ -31,3 +31,7 @@ The Doorboto process is kept running regardless of system restart via PM2.
 Doorboto's Logs are tracked via PM2.
 
 Doorboto's private config is tracked and held with Jitploy (to be deprecated, also optional if one knows the config)
+
+`LENIENCY` may optionally specify, in milliseconds, how long an expired
+membership remains authorized. It is disabled when unset. For example, the
+previous three-day grace period can be enabled with `LENIENCY=259200000`.

@@ -75,6 +75,18 @@ const itUnderstandsBadStanding = () => {
   }
 };
 
+const itDisablesLeniencyByDefault = () => {
+  const standing = checkStanding({
+    uid: oid(),
+    holder: 'Expired member',
+    expiry: Date.now() - 1,
+    validity: 'activeMember',
+  });
+  if (standing.authorized) {
+    throw new Error('Expired cards should be denied when LENIENCY is unset');
+  }
+};
+
 // Integration test to run with Mongo
 const recordsRejection = async () => {
   console.log(`running records rejection test in ${TEST_PATH}`);
@@ -207,6 +219,7 @@ module.exports = {
   recordsRejection,
   itUnderstandsGoodStanding,
   itUnderstandsBadStanding,
+  itDisablesLeniencyByDefault,
   itCanOpenDoorQuickly,
   canAuthRecentlyUpdated,
   cleanUpDb,
