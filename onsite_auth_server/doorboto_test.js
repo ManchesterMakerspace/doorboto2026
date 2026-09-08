@@ -34,7 +34,7 @@ const noValidDbTest = async () => {
   } catch (error) {
     console.log(`Authorize test issue => ${error}`);
   } finally {
-    await fs.rmdir(TEST_PATH, { recursive: true });
+    await fs.rm(TEST_PATH, { recursive: true });
     // Recursive option to be deprecated? No promise/async fs.rm? Confusing
   }
 };
@@ -95,7 +95,7 @@ const recordsRejection = async () => {
   } catch (error) {
     console.log(`Records rejection => ${error}`);
   } finally {
-    await fs.rmdir(TEST_PATH, { recursive: true });
+    await fs.rm(TEST_PATH, { recursive: true });
     // Recursive option to be deprecated? No promise/async fs.rm? Confusing
   }
 };
@@ -177,7 +177,7 @@ const canAuthRecentlyUpdated = async() => {
   } catch (error) {
     console.log(`Auth recent update => ${error}`);
   } finally {
-    await fs.rmdir(TEST_PATH, { recursive: true });
+    await fs.rm(TEST_PATH, { recursive: true });
     // Recursive option to be deprecated? No promise/async fs.rm? Confusing
   }
 }

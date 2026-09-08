@@ -82,7 +82,7 @@ const runCacheTest = async () => {
   } catch (error) {
     console.log(`Cache Issue => ${error}`);
   } finally {
-    await fs.rmdir(TEST_PATH, { recursive: true });
+    await fs.rm(TEST_PATH, { recursive: true });
     // Recursive option to be deprecated? No promise/async fs.rm? Confusing
   }
 };

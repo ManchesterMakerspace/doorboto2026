@@ -1,14 +1,10 @@
 // database_sync.mjs Copyright 2020 Manchester Makerspace Licence MIT
-const { MongoClient, ObjectID } = require('mongodb');
+const { MongoClient, ObjectId } = require('mongodb');
 
 const MONGODB_URI = process.env.MONGODB_URI;
 const DB_NAME = process.env.DB_NAME;
-const DB_OPTIONS = {
-  useUnifiedTopology: true,
-}
-
 const connectDB = async () => {
-  const client = new MongoClient(MONGODB_URI, DB_OPTIONS);
+  const client = new MongoClient(MONGODB_URI);
   const returnObj = {
     db: null,
     client: null,
@@ -31,7 +27,7 @@ const connectDB = async () => {
 const insertDoc = doc => {
   return {
     ...doc,
-    _id: new ObjectID(),
+    _id: new ObjectId(),
   };
 };
 

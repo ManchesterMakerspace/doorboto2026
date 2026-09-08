@@ -1,8 +1,4 @@
 // reader_com Copyright 2020 Manchester Makerspace MIT Licence
-const SerialPort = require('serialport');
-const Readline = require('@serialport/parser-readline');
-// on yun DO NOT NPM INSTALL -> opkg install node-serialport,
-// use global lib instead, actually new library probably no good
 const RETRY_DELAY = 5000;
 const ARDUINO_PORT = process.env.ARDUINO_PORT ?? null;
 
@@ -23,8 +19,12 @@ const serialInit = onData => {
     console.log(`Port failed to be specified`);
     return; 
   }
-  const port = new SerialPort(ARDUINO_PORT, { baudRate: 9600 });
-  const parser = new Readline({ delimiter: '\r\n' });
+  // Load the native serial dependency only when hardware is configured. This
+  // keeps non-hardware commands (including unit tests) portable.
+  const { SerialPort } = require('serialport');
+  const { ReadlineParser } = require('@serialport/parser-readline');
+  const port = new SerialPort({ path: ARDUINO_PORT, baudRate: 9600 });
+  const parser = new ReadlineParser({ delimiter: '\r\n' });
   // pipe read data through chosen parser
   port.pipe(parser);
   port.on('open', () => {
