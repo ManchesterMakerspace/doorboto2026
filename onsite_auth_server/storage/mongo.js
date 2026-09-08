@@ -8,7 +8,7 @@ const connectDB = async () => {
   const returnObj = {
     db: null,
     client: null,
-  }
+  };
   if (!MONGODB_URI || !DB_NAME) {
     logger.info(
       { event: 'mongodb.disabled' },
@@ -17,13 +17,17 @@ const connectDB = async () => {
     return returnObj;
   }
   const client = new MongoClient(MONGODB_URI);
-  try { 
+  try {
     await client.connect();
     returnObj.db = client.db(DB_NAME);
     returnObj.client = client;
     return returnObj;
   } catch (error) {
-    logger.error({ event: 'mongodb.connect.error', err: error }, 'MongoDB connection failed');
+    logger.error(
+      { event: 'mongodb.connect.error', err: error },
+      'MongoDB connection failed'
+    );
+    await client.close();
     return returnObj;
   }
 };
@@ -41,35 +45,38 @@ const makeRecordOfScanFunc = (db, client) => {
     const collection = authorized ? 'checkins' : 'rejections';
     const data = authorized
       ? {
-        name: cardData.holder,
-        time: new Date().getTime(),
-      }
+          name: cardData.holder,
+          time: new Date().getTime(),
+        }
       : {
-        ...cardData,
-        timeOf: new Date(),
-      };
-    await db.collection(collection).insertOne(insertDoc(data));
-    client.close();
-  }
-}
+          ...cardData,
+          timeOf: new Date(),
+        };
+    try {
+      await db.collection(collection).insertOne(insertDoc(data));
+    } finally {
+      await client.close();
+    }
+  };
+};
 
 // takes a card and returns an insert function
 const getCardFromDb = async uid => {
-  const {db, client} = await connectDB();
+  const { db, client } = await connectDB();
   // default to unregistered card
   const result = {
     dbCardData: null,
     recordScan: async () => {},
-  }
-  if(!db){
+  };
+  if (!db) {
     return result;
   }
   result.dbCardData = await db.collection('cards').findOne({ uid });
   result.recordScan = makeRecordOfScanFunc(db, client);
   return result;
-}
+};
 
-module.exports = { 
+module.exports = {
   connectDB,
   insertDoc,
   getCardFromDb,

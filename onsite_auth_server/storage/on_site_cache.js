@@ -1,13 +1,21 @@
 // on_site_cache.mjs Copyright 2020 Manchester Makerspace MIT Licence
 // local cache logic for power, database, or network failure events
-const storage = require('node-persist');
+const nodePersist = require('node-persist');
 const logger = require('../logger.js');
+
+// Use an explicit store rather than node-persist's process-wide default instance.
+// This keeps initialization and all subsequent operations bound to the same store.
+let storage;
 
 const cacheSetup = async dir => {
   try {
-    return await storage.init({ dir });
+    storage = nodePersist.create({ dir });
+    return await storage.init();
   } catch (error) {
-    logger.error({ event: 'cache.setup.error', err: error }, 'Cache setup failed');
+    logger.error(
+      { event: 'cache.setup.error', err: error },
+      'Cache setup failed'
+    );
   }
 };
 
@@ -31,13 +39,16 @@ const updateCard = async ({ holder, expiry, validity, uid }) => {
     await storage.setItem(uid, card);
     return true;
   } catch (error) {
-    logger.error({ event: 'cache.update.error', err: error, uid }, 'Cache update failed');
+    logger.error(
+      { event: 'cache.update.error', err: error, uid },
+      'Cache update failed'
+    );
     return false;
   }
 };
 
 // returns a matching card if it exist
-const checkForCard = async (uid) => {
+const checkForCard = async uid => {
   try {
     const cards = await storage.data();
     for (let info of cards) {
@@ -51,11 +62,14 @@ const checkForCard = async (uid) => {
     }
     return null;
   } catch (error) {
-    logger.error({ event: 'cache.read.error', err: error, uid }, 'Cache read failed');
+    logger.error(
+      { event: 'cache.read.error', err: error, uid },
+      'Cache read failed'
+    );
   }
 };
 
-module.exports = { 
+module.exports = {
   cacheSetup,
   updateCard,
   checkForCard,

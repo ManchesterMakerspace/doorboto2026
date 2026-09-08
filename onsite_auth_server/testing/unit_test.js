@@ -1,6 +1,7 @@
 // all_the_test.js Copyright 2020 Manchester Makerspace MIT License
 const { runCacheTest } = require('../storage/on_site_cache_test.js');
-const { 
+const { createsMongoObjectIds } = require('../storage/mongo_test.js');
+const {
   noValidDbTest,
   itUnderstandsBadStanding,
   itDisablesLeniencyByDefault,
@@ -12,14 +13,15 @@ const runThemAll = async () => {
     itUnderstandsGoodStanding();
     itUnderstandsBadStanding();
     itDisablesLeniencyByDefault();
+    createsMongoObjectIds();
     await runCacheTest();
     await noValidDbTest();
     process.exit(0);
-  } catch (error){
+  } catch (error) {
     console.log(`runThemAll => ${error}`);
     process.exitCode = 1;
   }
-}
+};
 
 const runOne = async () => {
   try {
@@ -29,13 +31,13 @@ const runOne = async () => {
     // await runCacheTest();
     // await noValidDbTest();
     // process.exit(0);
-  } catch (error){
+  } catch (error) {
     console.log(`runOne => ${error}`);
     process.exitCode = 1;
   }
-}
+};
 
-if(!module.parent){
+if (!module.parent) {
   // runOne();
   runThemAll();
 }
@@ -43,4 +45,4 @@ if(!module.parent){
 module.exports = {
   runThemAll,
   runOne,
-}
+};
