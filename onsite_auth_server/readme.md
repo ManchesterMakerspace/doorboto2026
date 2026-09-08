@@ -35,3 +35,12 @@ Doorboto's private config is tracked and held with Jitploy (to be deprecated, al
 `LENIENCY` may optionally specify, in milliseconds, how long an expired
 membership remains authorized. It is disabled when unset. For example, the
 previous three-day grace period can be enabled with `LENIENCY=259200000`.
+
+Application logs are emitted to stdout as newline-delimited JSON using Pino.
+Set `LOG_LEVEL` to adjust verbosity.
+
+Serial reconnects use exponential backoff capped at 30 seconds. If the port
+remains offline for `USB_SERIAL_RECOVERY_AFTER_SECONDS` (300 by default), the
+server runs `hardware_interface/usb-serial-recover.py`, passing the configured
+port as its first argument. Set `USB_SERIAL_RECOVERY_SCRIPT` to use a
+site-specific executable instead.

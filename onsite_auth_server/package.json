@@ -29,6 +29,7 @@
     "@serialport/parser-readline": "^13.0.0",
     "mongodb": "^6.20.0",
     "node-persist": "^4.0.4",
+    "pino": "^9.0.0",
     "serialport": "^13.0.0"
   },
   "engines": {
