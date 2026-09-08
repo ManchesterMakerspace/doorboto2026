@@ -1,0 +1,85 @@
+name: Test and deploy onsite server
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: doorboto-onsite-production
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: onsite_auth_server
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Use Node.js 24 with npm cache
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: onsite_auth_server/package-lock.json
+      - name: Verify npm 11 toolchain
+        run: |
+          node --version
+          npm --version
+          test "$(npm --version | cut -d. -f1)" -eq 11
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Run unit tests
+        run: npm test
+      - name: Lint JavaScript
+        run: npm exec -- eslint .
+      - name: Check formatting
+        run: npm exec -- prettier --check .
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    environment: onsite-production
+    steps:
+      - name: Configure deployment SSH key
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+      - name: Update, test, and restart Doorboto
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          port="${DEPLOY_PORT:-22}"
+          printf -v quoted_path '%q' "$DEPLOY_PATH"
+          ssh -p "$port" "$DEPLOY_USER@$DEPLOY_HOST" "bash -se -- $quoted_path" <<'REMOTE'
+          repository=$1
+          cd "$repository"
+          test "$(git branch --show-current)" = master
+          git fetch --prune origin master
+          git reset --hard origin/master
+          cd onsite_auth_server
+          test "$(node --version | cut -d. -f1 | tr -d v)" -eq 24
+          test "$(npm --version | cut -d. -f1)" -eq 11
+          npm ci
+          npm test
+          set -a
+          . ./prod.sh
+          set +a
+          npm exec -- pm2 start ecosystem.config.js --update-env
+          npm exec -- pm2 save
+          npm exec -- pm2 status doorboto
+          REMOTE

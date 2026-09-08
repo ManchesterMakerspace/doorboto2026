@@ -1,6 +1,6 @@
-const { cacheSetup, updateCard, checkForCard } = require( './on_site_cache.js');
-const fs = require( 'fs/promises');
-const oid = require( './oid.js');
+const { cacheSetup, updateCard, checkForCard } = require('./on_site_cache.js');
+const fs = require('fs/promises');
+const oid = require('./oid.js');
 
 const randomMockCard = () => {
   return {
@@ -17,8 +17,8 @@ const acceptedCard = () => {
     holder: Math.round(Math.random()) ? 'Alice' : 'Bob',
     expiry: new Date().getTime() + 3600000,
     validity: 'activeMember',
-  }
-}
+  };
+};
 
 const rejectedCard = () => {
   return {
@@ -26,8 +26,8 @@ const rejectedCard = () => {
     holder: Math.round(Math.random()) ? 'Alice' : 'Bob',
     expiry: new Date().getTime(),
     validity: 'lostCard',
-  }
-}
+  };
+};
 
 const createCardArray = total => {
   const cards = [];
@@ -35,7 +35,7 @@ const createCardArray = total => {
     cards.push(randomMockCard());
   }
   return cards;
-}
+};
 
 const createCards = async cards => {
   try {
@@ -45,7 +45,7 @@ const createCards = async cards => {
   } catch (error) {
     console.log(`create issue => ${error}`);
   }
-}
+};
 
 // load some cards see if they can be read
 // clean up the mess afterwards
@@ -99,4 +99,4 @@ module.exports = {
   runCacheTest,
   acceptedCard,
   rejectedCard,
-}
+};

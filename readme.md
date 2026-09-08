@@ -25,7 +25,7 @@ Take a look at install.sh and see if it's suitable to run in your environment.
 
 If it is suitable it should be possible to install all dependencies from scratch by running.
 
-    npm run install
+    npm run setup
 
 Create an executable script called prod.sh exporting the required env vars in ecosystem.config.js.
 

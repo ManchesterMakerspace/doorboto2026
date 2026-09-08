@@ -87,3 +87,27 @@ recovery, system startup restoration, SIGINT/SIGTERM shutdown, serial unplug
 and reconnect recovery, and log rotation on representative onsite hardware.
 Database credentials and the configured Arduino device are required for that
 acceptance test and are intentionally not stored in this repository.
+
+## Automatic deployment
+
+Every push to `master` runs the unit tests, ESLint, and Prettier check in GitHub
+Actions using Node 24 and npm 11. After those checks pass, the protected
+`onsite-production` environment connects to the onsite host over SSH, resets
+its existing `master` checkout to `origin/master`, performs another locked
+install and unit-test run on the target architecture, restarts Doorboto with
+the current environment, saves the PM2 process list, and checks its status.
+
+Configure these GitHub environment secrets:
+
+- `DEPLOY_HOST`: hostname or IP address of the onsite host.
+- `DEPLOY_USER`: unprivileged application account with serial-device access.
+- `DEPLOY_PATH`: absolute path to the existing Doorboto Git checkout.
+- `DEPLOY_PORT`: SSH port; omit it to use port 22.
+- `DEPLOY_SSH_KEY`: private key dedicated to the deployment account.
+- `DEPLOY_KNOWN_HOSTS`: pinned `known_hosts` entry for the deployment host.
+
+The deployment account must be able to fetch the repository and manage the
+same user-owned PM2 process list used during initial setup. Keep production
+configuration in `prod.sh` on the host; it remains untracked. Configure required
+reviewers on the `onsite-production` GitHub environment if deployments need
+manual approval after CI passes.
