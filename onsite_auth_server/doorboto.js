@@ -7,9 +7,14 @@ const {
 } = require('./storage/on_site_cache.js');
 const { serialInit } = require('./hardware_interface/reader_com.js');
 const { slackSend, adminAttention } = require('./outward_telemetry/slack.js');
+const logger = require('./logger.js');
 
+const configuredLeniency = Number(process.env.LENIENCY ?? 0);
+// LENIENCY is optional, expressed in milliseconds, and disabled by default.
+const LENIENCY = Number.isFinite(configuredLeniency)
+  ? Math.max(0, configuredLeniency)
+  : 0;
 const HOUR = 3600000; // milliseconds in an hour
-const LENIENCY = HOUR * 72; // give 3 days for a card to be renewed
 
 // Looks at card data and returns an object representing member standing
 const checkStanding = cardData => {
@@ -92,7 +97,7 @@ const cronUpdate = async (recurse = true) => {
     }
     client.close();
   } catch (error) {
-    console.log(`Issue connecting on update: ${error}`);
+    logger.error({ event: 'cache.refresh.error', err: error }, 'Cache refresh failed');
   }
   // make upcoming expiration check every interval
   if(recurse){

@@ -1,11 +1,13 @@
 // slack.mjs Copyright 2020 Manchester Makerspace Licence MIT
 const { request } = require('https');
+const logger = require('../logger.js');
 const DEFAULT_WEBHOOK = process.env.DOORBOTO_WEBHOOK || ''
 
 const slackSend = (msg, path = DEFAULT_WEBHOOK) => {
   return new Promise((resolve) => {
     if(!path){
-      console.log(msg);
+      logger.info({ event: 'slack.skipped', notification: msg }, 'Slack webhook is not configured');
+      resolve();
       return;
     }
     const postData = JSON.stringify({ text: msg });
@@ -20,6 +22,10 @@ const slackSend = (msg, path = DEFAULT_WEBHOOK) => {
       },
     };
     const req = request(options, resolve);
+    req.on('error', error => {
+      logger.error({ event: 'slack.request.error', err: error }, 'Slack request failed');
+      resolve();
+    });
     // just do it, no need for response
     req.write(postData);
     req.end();

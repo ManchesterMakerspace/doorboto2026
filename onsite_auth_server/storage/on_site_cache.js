@@ -1,26 +1,38 @@
 // on_site_cache.mjs Copyright 2020 Manchester Makerspace MIT Licence
 // local cache logic for power, database, or network failure events
 const storage = require('node-persist');
+const logger = require('../logger.js');
 
 const cacheSetup = async dir => {
   try {
     return await storage.init({ dir });
   } catch (error) {
-    console.log(`cacheSetup => ${error}`);
+    logger.error({ event: 'cache.setup.error', err: error }, 'Cache setup failed');
   }
 };
 
 // Takes a card object and sets it to local storage
 const updateCard = async ({ holder, expiry, validity, uid }) => {
   expiry = Number(expiry);
+  const card = {
+    holder,
+    expiry,
+    validity,
+  };
   try {
-    await storage.setItem(uid, {
-      holder,
-      expiry,
-      validity,
-    });
+    const existingCard = await storage.getItem(uid);
+    if (
+      existingCard?.holder === card.holder &&
+      existingCard?.expiry === card.expiry &&
+      existingCard?.validity === card.validity
+    ) {
+      return false;
+    }
+    await storage.setItem(uid, card);
+    return true;
   } catch (error) {
-    console.log(`updateCard => ${error}`);
+    logger.error({ event: 'cache.update.error', err: error, uid }, 'Cache update failed');
+    return false;
   }
 };
 
@@ -39,7 +51,7 @@ const checkForCard = async (uid) => {
     }
     return null;
   } catch (error) {
-    console.log(`checkForCard => ${error}`);
+    logger.error({ event: 'cache.read.error', err: error, uid }, 'Cache read failed');
   }
 };
 

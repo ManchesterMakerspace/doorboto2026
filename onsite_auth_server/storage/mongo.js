@@ -1,29 +1,29 @@
 // database_sync.mjs Copyright 2020 Manchester Makerspace Licence MIT
-const { MongoClient, ObjectID } = require('mongodb');
+const { MongoClient, ObjectId } = require('mongodb');
+const logger = require('../logger.js');
 
 const MONGODB_URI = process.env.MONGODB_URI;
 const DB_NAME = process.env.DB_NAME;
-const DB_OPTIONS = {
-  useUnifiedTopology: true,
-}
-
 const connectDB = async () => {
-  const client = new MongoClient(MONGODB_URI, DB_OPTIONS);
   const returnObj = {
     db: null,
     client: null,
   }
   if (!MONGODB_URI || !DB_NAME) {
-    console.log(`Invalid env: ${DB_NAME} @ ${MONGODB_URI}`);
+    logger.info(
+      { event: 'mongodb.disabled' },
+      'MongoDB configuration is absent; using cache-only mode'
+    );
     return returnObj;
   }
+  const client = new MongoClient(MONGODB_URI);
   try { 
     await client.connect();
     returnObj.db = client.db(DB_NAME);
     returnObj.client = client;
     return returnObj;
   } catch (error) {
-    console.log(`connectDb => ${error}`);
+    logger.error({ event: 'mongodb.connect.error', err: error }, 'MongoDB connection failed');
     return returnObj;
   }
 };
@@ -31,7 +31,7 @@ const connectDB = async () => {
 const insertDoc = doc => {
   return {
     ...doc,
-    _id: new ObjectID(),
+    _id: new ObjectId(),
   };
 };
 

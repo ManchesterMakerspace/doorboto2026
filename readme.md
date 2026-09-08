@@ -4,7 +4,7 @@
   - OSX would probably work as well. Roll your own install script
   - A x86 64 bit Debian based Distro was the dev env, and it's less finicky with Serialport
   - Windows 10 ??? not sure. Try to roll your own install script
-- Node.js and NPM: To run doorboto use versions specified in package.json. Serial library is picky
+- Node.js 24 LTS and npm 11 or newer, as specified in `package.json`.
 - A mongo server where your members database is managed by another program.
   - This Mongo server could be local or remote. Either way remember to use access control on the mongo server.
   - Mongo Atlas has a free tier cloud instance that can be setup easily.
@@ -34,6 +34,8 @@ Run the following
     npm start
 
 ## Updates
+
+9/8/2026 - Updated the onsite server for Node.js 24 LTS, including current MongoDB and SerialPort APIs.
 
 5/1/2020 - Hardware Note: we are currently using a raspberry pi instead of a dedicated desktop PC but it is using a usb drive instead of an SD.
 
