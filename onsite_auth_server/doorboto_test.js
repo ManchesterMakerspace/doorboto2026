@@ -21,18 +21,30 @@ const COLLECTIONS = [CARDS, CHECKIN, REJECTION];
 // Unit test to run without database env vars
 const noValidDbTest = async () => {
   console.log(`running no valid db test in ${TEST_PATH}`);
+  const authorizationResults = [];
   try {
     await cacheSetup(TEST_PATH);
     const cards = [acceptedCard(), rejectedCard()];
     await createCards(cards);
     for (let i = 0; i < cards.length; i++) {
       await authorize(cards[i].uid, authorized => {
+        authorizationResults.push(authorized);
         const status = authorized ? 'checked in' : 'rejected';
         console.log(`${cards[i].holder} was ${status} without database`);
-      }).catch(console.log);
+      });
+    }
+    if (
+      authorizationResults.length !== 2 ||
+      authorizationResults[0] !== true ||
+      authorizationResults[1] !== false
+    ) {
+      throw new Error(
+        `Cache-only authorization returned ${JSON.stringify(authorizationResults)}`
+      );
     }
   } catch (error) {
     console.log(`Authorize test issue => ${error}`);
+    throw error;
   } finally {
     await fs.rm(TEST_PATH, { recursive: true });
     // Recursive option to be deprecated? No promise/async fs.rm? Confusing

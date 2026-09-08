@@ -4,7 +4,6 @@ const { MongoClient, ObjectId } = require('mongodb');
 const MONGODB_URI = process.env.MONGODB_URI;
 const DB_NAME = process.env.DB_NAME;
 const connectDB = async () => {
-  const client = new MongoClient(MONGODB_URI);
   const returnObj = {
     db: null,
     client: null,
@@ -13,6 +12,7 @@ const connectDB = async () => {
     console.log(`Invalid env: ${DB_NAME} @ ${MONGODB_URI}`);
     return returnObj;
   }
+  const client = new MongoClient(MONGODB_URI);
   try { 
     await client.connect();
     returnObj.db = client.db(DB_NAME);

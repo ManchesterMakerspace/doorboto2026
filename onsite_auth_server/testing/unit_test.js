@@ -17,6 +17,7 @@ const runThemAll = async () => {
     process.exit(0);
   } catch (error){
     console.log(`runThemAll => ${error}`);
+    process.exitCode = 1;
   }
 }
 
@@ -30,6 +31,7 @@ const runOne = async () => {
     // process.exit(0);
   } catch (error){
     console.log(`runOne => ${error}`);
+    process.exitCode = 1;
   }
 }
 
