@@ -4,14 +4,14 @@
   "description": "This is a server for an access control system",
   "main": "doorboto.js",
   "scripts": {
-    "start": ". ./prod.sh && pm2 start ecosystem.config.js",
+    "start": ". ./prod.sh && npm exec -- pm2 start ecosystem.config.js",
     "test": "node testing/unit_test.js",
     "i-test": "testing/./run_integration.sh",
     "manual-test": "nodemon doorboto.js",
-    "show-logs": "pm2 logs",
-    "shutdown": "pm2 delete ecosystem.config.js",
-    "restart": "pm2 restart ecosystem.config.js",
-    "install": "./install.sh",
+    "show-logs": "npm exec -- pm2 logs doorboto",
+    "shutdown": "npm exec -- pm2 delete doorboto",
+    "restart": "npm exec -- pm2 restart ecosystem.config.js --update-env",
+    "setup": "./install.sh",
     "postversion": "git add . && git commit && git push && git push --tags"
   },
   "repository": {
@@ -29,6 +29,7 @@
     "@serialport/parser-readline": "^13.0.0",
     "mongodb": "^6.20.0",
     "node-persist": "^4.0.4",
+    "pm2": "^6.0.14",
     "pino": "^9.0.0",
     "serialport": "^13.0.0"
   },
