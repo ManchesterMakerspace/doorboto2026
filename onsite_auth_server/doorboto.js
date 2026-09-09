@@ -116,10 +116,18 @@ const cronUpdate = async (recurse = true) => {
       'Cache refresh failed'
     );
   } finally {
-    await closeMongoClient(client);
-    // make upcoming expiration check every interval
-    if (recurse) {
-      cronTimer = setTimeout(cronUpdate, HOUR);
+    try {
+      await closeMongoClient(client);
+    } catch (error) {
+      logger.error(
+        { event: 'cache.refresh.close.error', err: error },
+        'Failed to close the cache refresh MongoDB client'
+      );
+    } finally {
+      // Closing a stale client must not stop future cache refreshes.
+      if (recurse) {
+        cronTimer = setTimeout(cronUpdate, HOUR);
+      }
     }
   }
 };
