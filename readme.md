@@ -17,21 +17,28 @@
 
 In the current implementation an Raspberry Pi is use in combination with a Arduino nano connected using usb communicating over serial on port /dev/ttyATH0. This port may need to added to the dial out group on the PI for doorboto to have permission to use it.
 
-To get the latest version of this repo
+To get the latest version of this repo and enter the Node application directory:
 
-    git clone https://github.com/ManchesterMakerspace/doorboto2.git
+```sh
+git clone https://github.com/ManchesterMakerspace/doorboto2.git
+cd doorboto2/onsite_auth_server
+```
 
-Take a look at install.sh and see if it's suitable to run in your environment.
+Review `onsite_auth_server/install.sh` before running it. From the
+`onsite_auth_server` directory, create an executable `prod.sh` that exports the
+environment variables used by `ecosystem.config.js`.
 
-If it is suitable it should be possible to install all dependencies from scratch by running.
+Then install the locked dependencies and configure the service with:
 
-    npm run setup
+```sh
+npm run setup
+```
 
-Create an executable script called prod.sh exporting the required env vars in ecosystem.config.js.
+Start the configured service with:
 
-Run the following
-
-    npm start
+```sh
+npm start
+```
 
 ## Updates
 
