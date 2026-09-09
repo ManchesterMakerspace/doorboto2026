@@ -98,8 +98,10 @@ Actions using Node 24 and npm 11. After those checks pass, the protected
 its existing checkout to the exact commit that passed CI and environment
 approval, first validates that revision with a locked install and unit-test run
 in a temporary Git worktree on the target architecture, and only then replaces
-the live checkout and restarts Doorboto. A failed target-side validation leaves
-the live checkout and running PM2 process untouched.
+the live checkout and dependency tree before restarting Doorboto. The previous
+revision and its complete `node_modules` tree are retained until PM2 reports the
+new release online, and are restored if promotion fails. A failed target-side
+validation leaves the live checkout and running PM2 process untouched.
 
 Configure these GitHub environment secrets:
 
