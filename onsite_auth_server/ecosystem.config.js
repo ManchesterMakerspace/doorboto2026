@@ -30,6 +30,8 @@ module.exports = {
         LOG_LEVEL: process.env.LOG_LEVEL,
         USB_SERIAL_RECOVERY_AFTER_SECONDS:
           process.env.USB_SERIAL_RECOVERY_AFTER_SECONDS,
+        USB_SERIAL_RECOVERY_TIMEOUT_SECONDS:
+          process.env.USB_SERIAL_RECOVERY_TIMEOUT_SECONDS,
         USB_SERIAL_RECOVERY_SCRIPT: process.env.USB_SERIAL_RECOVERY_SCRIPT,
       },
       env_testing: {
@@ -41,6 +43,7 @@ module.exports = {
         LENIENCY: '',
         LOG_LEVEL: 'info',
         USB_SERIAL_RECOVERY_AFTER_SECONDS: '300',
+        USB_SERIAL_RECOVERY_TIMEOUT_SECONDS: '30',
         USB_SERIAL_RECOVERY_SCRIPT: '',
       },
     },

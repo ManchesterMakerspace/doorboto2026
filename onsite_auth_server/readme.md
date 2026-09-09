@@ -47,7 +47,9 @@ Serial reconnects use exponential backoff capped at 30 seconds. If the port
 remains offline for `USB_SERIAL_RECOVERY_AFTER_SECONDS` (300 by default), the
 server runs `hardware_interface/usb-serial-recover.py`, passing the configured
 port as its first argument. Set `USB_SERIAL_RECOVERY_SCRIPT` to use a
-site-specific executable instead.
+site-specific executable instead. Recovery helpers are forcibly stopped after
+`USB_SERIAL_RECOVERY_TIMEOUT_SECONDS` (30 seconds by default), after which
+normal serial reconnect attempts resume.
 
 ## Install and PM2 operations
 

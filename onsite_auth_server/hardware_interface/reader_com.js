@@ -12,6 +12,12 @@ const recoveryAfter = Number(
 const RECOVERY_AFTER_MS = Number.isFinite(recoveryAfter)
   ? Math.max(0, recoveryAfter) * 1000
   : 300000;
+const recoveryTimeout = Number(
+  process.env.USB_SERIAL_RECOVERY_TIMEOUT_SECONDS ?? 30
+);
+const RECOVERY_TIMEOUT_MS = Number.isFinite(recoveryTimeout)
+  ? Math.max(1, recoveryTimeout) * 1000
+  : 30000;
 const RECOVERY_SCRIPT =
   process.env.USB_SERIAL_RECOVERY_SCRIPT ||
   path.join(__dirname, 'usb-serial-recover.py');
@@ -45,26 +51,39 @@ const transition = (nextState, details = {}) => {
 
 const runRecovery = reconnect => {
   recoveryAttempted = true;
-  transition(STATES.RECOVERING, { script: RECOVERY_SCRIPT });
-  execFile(RECOVERY_SCRIPT, [ARDUINO_PORT], (error, stdout, stderr) => {
-    if (error) {
-      logger.error(
-        {
-          event: 'serial.recovery.error',
-          err: error,
-          stderr,
-          script: RECOVERY_SCRIPT,
-        },
-        'USB serial recovery helper failed'
-      );
-    } else {
-      logger.info(
-        { event: 'serial.recovery.complete', stdout, script: RECOVERY_SCRIPT },
-        'USB serial recovery helper completed'
-      );
-    }
-    reconnect();
+  transition(STATES.RECOVERING, {
+    script: RECOVERY_SCRIPT,
+    timeout: RECOVERY_TIMEOUT_MS,
   });
+  execFile(
+    RECOVERY_SCRIPT,
+    [ARDUINO_PORT],
+    { timeout: RECOVERY_TIMEOUT_MS, killSignal: 'SIGKILL' },
+    (error, stdout, stderr) => {
+      if (error) {
+        logger.error(
+          {
+            event: 'serial.recovery.error',
+            err: error,
+            stderr,
+            script: RECOVERY_SCRIPT,
+            timeout: RECOVERY_TIMEOUT_MS,
+          },
+          'USB serial recovery helper failed or timed out'
+        );
+      } else {
+        logger.info(
+          {
+            event: 'serial.recovery.complete',
+            stdout,
+            script: RECOVERY_SCRIPT,
+          },
+          'USB serial recovery helper completed'
+        );
+      }
+      reconnect();
+    }
+  );
 };
 
 const scheduleReconnect = reason => {
@@ -73,7 +92,7 @@ const scheduleReconnect = reason => {
   offlineSince ??= Date.now();
   const reconnect = () => {
     retryTimer = null;
-    connect();
+    if (!shuttingDown) connect();
   };
   if (!recoveryAttempted && Date.now() - offlineSince >= RECOVERY_AFTER_MS) {
     runRecovery(reconnect);
