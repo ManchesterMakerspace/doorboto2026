@@ -1,11 +1,19 @@
 // doorboto.mjs ~ Copyright 2020 Manchester Makerspace ~ License MIT
-const { connectDB, getCardFromDb } = require('./storage/mongo.js');
+const {
+  closeMongoClient,
+  closeMongoConnections,
+  connectDB,
+  getCardFromDb,
+} = require('./storage/mongo.js');
 const {
   cacheSetup,
   updateCard,
   checkForCard,
 } = require('./storage/on_site_cache.js');
-const { serialInit } = require('./hardware_interface/reader_com.js');
+const {
+  serialClose,
+  serialInit,
+} = require('./hardware_interface/reader_com.js');
 const { slackSend, adminAttention } = require('./outward_telemetry/slack.js');
 const logger = require('./logger.js');
 
@@ -15,6 +23,8 @@ const LENIENCY = Number.isFinite(configuredLeniency)
   ? Math.max(0, configuredLeniency)
   : 0;
 const HOUR = 3600000; // milliseconds in an hour
+let cronTimer = null;
+let shuttingDown = false;
 
 // Looks at card data and returns an object representing member standing
 const checkStanding = cardData => {
@@ -23,7 +33,7 @@ const checkStanding = cardData => {
     return standing;
   }
   const { validity, holder, expiry } = cardData;
-  const whom = holder ? `${holder}'s ` : ''
+  const whom = holder ? `${holder}'s ` : '';
   standing.cardData = { ...cardData };
   standing.msg = `${whom}${validity} card was scanned`;
   // make sure card has been marked with a valid state and unexpired
@@ -41,18 +51,19 @@ const checkStanding = cardData => {
 const authorize = async (uid, giveAccess) => {
   const cacheCardData = await checkForCard(uid);
   let standing = checkStanding(cacheCardData);
-  if(standing.authorized){
+  if (standing.authorized) {
     giveAccess(true);
     slackSend(standing.msg);
   }
-  const { dbCardData, recordScan } = await getCardFromDb(uid)
-    .catch(error => {
-      const authStatus = standing.authorized ? 'checked in but' : 'was denied and';
-      const situation = standing?.cardData
-        ? `${standing.cardData.holder} ${authStatus}`
-        : `Cache empty and `;
-      adminAttention(`${situation} DB unavailable to check ${uid}: => ${error}`);
-    });
+  const { dbCardData, recordScan } = await getCardFromDb(uid).catch(error => {
+    const authStatus = standing.authorized
+      ? 'checked in but'
+      : 'was denied and';
+    const situation = standing?.cardData
+      ? `${standing.cardData.holder} ${authStatus}`
+      : `Cache empty and `;
+    adminAttention(`${situation} DB unavailable to check ${uid}: => ${error}`);
+  });
   // if not authorized by cache check against db data
   if (!standing.authorized) {
     // figure ultimately if this is an unregistered user
@@ -64,7 +75,7 @@ const authorize = async (uid, giveAccess) => {
           validity: 'unregistered',
           holder: null,
           expiry: null,
-      };
+        };
     standing = checkStanding(cardData);
     // if authorized trigger strike if not flash red
     giveAccess(standing.authorized);
@@ -85,8 +96,12 @@ const authorize = async (uid, giveAccess) => {
 
 // runs a time based update operation
 const cronUpdate = async (recurse = true) => {
+  let client = null;
   try {
-    const { db, client } = await connectDB();
+    const connection = await connectDB();
+    const { db } = connection;
+    client = connection.client;
+    if (!db) return;
     const cursor = db.collection('cards').find({});
     let card;
     while ((card = await cursor.next())) {
@@ -95,28 +110,70 @@ const cronUpdate = async (recurse = true) => {
         await updateCard(card);
       }
     }
-    client.close();
   } catch (error) {
-    logger.error({ event: 'cache.refresh.error', err: error }, 'Cache refresh failed');
-  }
-  // make upcoming expiration check every interval
-  if(recurse){
-    setTimeout(cronUpdate, HOUR);
+    logger.error(
+      { event: 'cache.refresh.error', err: error },
+      'Cache refresh failed'
+    );
+  } finally {
+    try {
+      await closeMongoClient(client);
+    } catch (error) {
+      logger.error(
+        { event: 'cache.refresh.close.error', err: error },
+        'Failed to close the cache refresh MongoDB client'
+      );
+    } finally {
+      // Closing a stale client must not stop future cache refreshes.
+      if (recurse) {
+        cronTimer = setTimeout(cronUpdate, HOUR);
+      }
+    }
   }
 };
 
 // High level start up sequence
 const run = async () => {
   await cacheSetup('./members/');
-  // Pass arduino connection function a callback to handle on data events
-  serialInit(authorize);
-  // Regular database check that updates local cache
-  cronUpdate();
+  // Open the reader immediately so cached cards continue to work while an
+  // unavailable MongoDB deployment waits for server selection to time out.
+  const serialReady = serialInit(authorize);
+  const initialRefresh = cronUpdate(false);
+  // Schedule future refreshes independently of serial readiness. A disconnected
+  // reader must not prevent membership updates from reaching the local cache.
+  cronTimer = setTimeout(cronUpdate, HOUR);
+  await Promise.all([serialReady, initialRefresh]);
+  process.send?.('ready');
+};
+
+const shutdown = async signal => {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  logger.info({ event: 'shutdown.start', signal }, 'Graceful shutdown started');
+  if (cronTimer) clearTimeout(cronTimer);
+  const results = await Promise.allSettled([
+    serialClose(),
+    closeMongoConnections(),
+  ]);
+  const failures = results.filter(result => result.status === 'rejected');
+  if (failures.length) {
+    logger.error(
+      { event: 'shutdown.error', failures },
+      'Graceful shutdown failed'
+    );
+    process.exitCode = 1;
+  }
+  process.exit();
 };
 
 // Run doorboto if not being called by test or other applications
 if (!module.parent) {
-  run();
+  process.once('SIGINT', () => void shutdown('SIGINT'));
+  process.once('SIGTERM', () => void shutdown('SIGTERM'));
+  run().catch(error => {
+    logger.fatal({ event: 'startup.error', err: error }, 'Startup failed');
+    process.exit(1);
+  });
 }
 
 module.exports = {
@@ -124,4 +181,5 @@ module.exports = {
   cronUpdate,
   checkStanding,
   run,
+  shutdown,
 };

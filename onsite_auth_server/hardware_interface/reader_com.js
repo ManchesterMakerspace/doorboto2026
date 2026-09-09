@@ -6,10 +6,18 @@ const logger = require('../logger.js');
 const ARDUINO_PORT = process.env.ARDUINO_PORT || null;
 const INITIAL_RETRY_DELAY = 1000;
 const MAX_RETRY_DELAY = 30000;
-const recoveryAfter = Number(process.env.USB_SERIAL_RECOVERY_AFTER_SECONDS ?? 300);
+const recoveryAfter = Number(
+  process.env.USB_SERIAL_RECOVERY_AFTER_SECONDS ?? 300
+);
 const RECOVERY_AFTER_MS = Number.isFinite(recoveryAfter)
   ? Math.max(0, recoveryAfter) * 1000
   : 300000;
+const recoveryTimeout = Number(
+  process.env.USB_SERIAL_RECOVERY_TIMEOUT_SECONDS ?? 30
+);
+const RECOVERY_TIMEOUT_MS = Number.isFinite(recoveryTimeout)
+  ? Math.max(1, recoveryTimeout) * 1000
+  : 30000;
 const RECOVERY_SCRIPT =
   process.env.USB_SERIAL_RECOVERY_SCRIPT ||
   path.join(__dirname, 'usb-serial-recover.py');
@@ -29,6 +37,8 @@ let offlineSince = null;
 let recoveryAttempted = false;
 let activePort = null;
 let dataHandler = null;
+let shuttingDown = false;
+let readyResolve = null;
 
 const transition = (nextState, details = {}) => {
   const previousState = state;
@@ -41,30 +51,48 @@ const transition = (nextState, details = {}) => {
 
 const runRecovery = reconnect => {
   recoveryAttempted = true;
-  transition(STATES.RECOVERING, { script: RECOVERY_SCRIPT });
-  execFile(RECOVERY_SCRIPT, [ARDUINO_PORT], (error, stdout, stderr) => {
-    if (error) {
-      logger.error(
-        { event: 'serial.recovery.error', err: error, stderr, script: RECOVERY_SCRIPT },
-        'USB serial recovery helper failed'
-      );
-    } else {
-      logger.info(
-        { event: 'serial.recovery.complete', stdout, script: RECOVERY_SCRIPT },
-        'USB serial recovery helper completed'
-      );
-    }
-    reconnect();
+  transition(STATES.RECOVERING, {
+    script: RECOVERY_SCRIPT,
+    timeout: RECOVERY_TIMEOUT_MS,
   });
+  execFile(
+    RECOVERY_SCRIPT,
+    [ARDUINO_PORT],
+    { timeout: RECOVERY_TIMEOUT_MS, killSignal: 'SIGKILL' },
+    (error, stdout, stderr) => {
+      if (error) {
+        logger.error(
+          {
+            event: 'serial.recovery.error',
+            err: error,
+            stderr,
+            script: RECOVERY_SCRIPT,
+            timeout: RECOVERY_TIMEOUT_MS,
+          },
+          'USB serial recovery helper failed or timed out'
+        );
+      } else {
+        logger.info(
+          {
+            event: 'serial.recovery.complete',
+            stdout,
+            script: RECOVERY_SCRIPT,
+          },
+          'USB serial recovery helper completed'
+        );
+      }
+      reconnect();
+    }
+  );
 };
 
 const scheduleReconnect = reason => {
-  if (retryTimer || state === STATES.RECOVERING) return;
+  if (shuttingDown || retryTimer || state === STATES.RECOVERING) return;
 
   offlineSince ??= Date.now();
   const reconnect = () => {
     retryTimer = null;
-    connect();
+    if (!shuttingDown) connect();
   };
   if (!recoveryAttempted && Date.now() - offlineSince >= RECOVERY_AFTER_MS) {
     runRecovery(reconnect);
@@ -72,7 +100,7 @@ const scheduleReconnect = reason => {
   }
 
   const delay = Math.min(
-    INITIAL_RETRY_DELAY * (2 ** retryAttempt),
+    INITIAL_RETRY_DELAY * 2 ** retryAttempt,
     MAX_RETRY_DELAY
   );
   retryAttempt += 1;
@@ -115,6 +143,8 @@ const connect = () => {
       offlineSince = null;
       recoveryAttempted = false;
       transition(STATES.ONLINE, { port: ARDUINO_PORT });
+      readyResolve?.();
+      readyResolve = null;
     });
     parser.on('data', data => {
       dataHandler(data, authorized => {
@@ -163,10 +193,34 @@ const serialInit = onData => {
       { event: 'serial.disabled' },
       'ARDUINO_PORT is not configured; serial access is disabled'
     );
-    return;
+    return Promise.resolve();
   }
-  if (activePort || retryTimer || state === STATES.CONNECTING) return;
+  if (activePort?.isOpen) return Promise.resolve();
+  if (retryTimer || state === STATES.CONNECTING) {
+    return new Promise(resolve => {
+      readyResolve = resolve;
+    });
+  }
+  shuttingDown = false;
+  const ready = new Promise(resolve => {
+    readyResolve = resolve;
+  });
   connect();
+  return ready;
 };
 
-module.exports = { serialInit, STATES };
+const serialClose = async () => {
+  shuttingDown = true;
+  if (retryTimer) {
+    clearTimeout(retryTimer);
+    retryTimer = null;
+  }
+  const port = activePort;
+  activePort = null;
+  if (!port?.isOpen) return;
+  await new Promise((resolve, reject) => {
+    port.close(error => (error ? reject(error) : resolve()));
+  });
+};
+
+module.exports = { serialInit, serialClose, STATES };

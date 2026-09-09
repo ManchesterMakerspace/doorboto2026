@@ -1,0 +1,154 @@
+name: Test and deploy onsite server
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: doorboto-onsite-production
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: onsite_auth_server
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Use Node.js 24 with npm cache
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: onsite_auth_server/package-lock.json
+      - name: Verify npm 11 toolchain
+        run: |
+          node --version
+          npm --version
+          test "$(npm --version | cut -d. -f1)" -eq 11
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Run unit tests
+        run: npm test
+      - name: Lint JavaScript
+        run: npm exec -- eslint .
+      - name: Check formatting
+        run: npm exec -- prettier --check .
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    environment: onsite-production
+    steps:
+      - name: Configure deployment SSH key
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+      - name: Update, test, and restart Doorboto
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_REVISION: ${{ github.sha }}
+        run: |
+          port="${DEPLOY_PORT:-22}"
+          printf -v quoted_path '%q' "$DEPLOY_PATH"
+          printf -v quoted_revision '%q' "$DEPLOY_REVISION"
+          ssh -p "$port" "$DEPLOY_USER@$DEPLOY_HOST" "bash -se -- $quoted_path $quoted_revision" <<'REMOTE'
+          repository=$1
+          revision=$2
+          cd "$repository"
+          test "$(git branch --show-current)" = master
+          test "${#revision}" -eq 40
+          case "$revision" in
+            (*[!0-9a-f]*|'') echo "Invalid deployment revision: $revision" >&2; exit 2 ;;
+          esac
+          git fetch --no-tags origin "$revision"
+
+          validation_dir=$(mktemp -d)
+          cleanup_validation() {
+            cd "$repository"
+            git worktree remove --force "$validation_dir" >/dev/null 2>&1 || true
+            rm -rf "$validation_dir"
+          }
+          trap cleanup_validation EXIT
+          git worktree add --detach "$validation_dir" "$revision"
+          cd "$validation_dir/onsite_auth_server"
+          test "$(node --version | cut -d. -f1 | tr -d v)" -eq 24
+          test "$(npm --version | cut -d. -f1)" -eq 11
+          npm ci
+          npm test
+
+          previous_revision=$(git -C "$repository" rev-parse HEAD)
+          live_modules="$repository/onsite_auth_server/node_modules"
+          modules_backup=$(mktemp -d "$repository/.doorboto-node_modules.XXXXXX")
+          rmdir "$modules_backup"
+          modules_backed_up=false
+          modules_promoted=false
+          deployment_complete=false
+          rollback_deployment() {
+            if [ "$deployment_complete" != true ]; then
+              cd "$repository"
+              git reset --hard "$previous_revision" || true
+              if [ "$modules_promoted" = true ]; then
+                rm -rf "$live_modules"
+              fi
+              if [ "$modules_backed_up" = true ] && [ -d "$modules_backup" ]; then
+                mv "$modules_backup" "$live_modules"
+              fi
+              if [ -d "$live_modules" ]; then
+                cd "$repository/onsite_auth_server"
+                set -a
+                . ./prod.sh
+                set +a
+                npm exec -- pm2 start ecosystem.config.js --update-env || true
+                npm exec -- pm2 save || true
+              fi
+            fi
+            cleanup_validation
+          }
+          trap rollback_deployment EXIT
+
+          cd "$repository"
+          git reset --hard "$revision"
+          test "$(git rev-parse HEAD)" = "$revision"
+          if [ -d "$live_modules" ]; then
+            mv "$live_modules" "$modules_backup"
+            modules_backed_up=true
+          fi
+          mv "$validation_dir/onsite_auth_server/node_modules" "$live_modules"
+          modules_promoted=true
+          cleanup_validation
+
+          cd "$repository/onsite_auth_server"
+          set -a
+          . ./prod.sh
+          set +a
+          npm exec -- pm2 start ecosystem.config.js --update-env
+          npm exec -- pm2 save
+          npm exec -- pm2 status doorboto
+          npm exec -- pm2 jlist | node -e '
+            let input = "";
+            process.stdin.on("data", chunk => (input += chunk));
+            process.stdin.on("end", () => {
+              const doorboto = JSON.parse(input).find(app => app.name === "doorboto");
+              if (doorboto?.pm2_env?.status !== "online") process.exit(1);
+            });
+          '
+          deployment_complete=true
+          rm -rf "$modules_backup"
+          trap - EXIT
+          REMOTE

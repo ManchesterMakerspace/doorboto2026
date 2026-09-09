@@ -165,7 +165,7 @@ const itCanOpenDoorQuickly = async () => {
 };
 
 // integration test to see if database is double checked if cache is out of data
-const canAuthRecentlyUpdated = async() => {
+const canAuthRecentlyUpdated = async () => {
   console.log(`running can auth recent update test in ${TEST_PATH}`);
   try {
     await cacheSetup(TEST_PATH);
@@ -190,10 +190,14 @@ const canAuthRecentlyUpdated = async() => {
       const finishDuration = finishMillis - startMillis;
       console.log(`it took ${finishDuration} millis to auth a new user`);
     });
-    if(checkCount !== 1){
-      console.log(`FAILURE: Check standing was called more than once or not at all`);
+    if (checkCount !== 1) {
+      console.log(
+        `FAILURE: Check standing was called more than once or not at all`
+      );
     }
-    const checkinDoc = await db.collection(CHECKIN).findOne({ name: card.holder });
+    const checkinDoc = await db
+      .collection(CHECKIN)
+      .findOne({ name: card.holder });
     const checkinResult = checkinDoc ? 'SUCCESS' : 'FAILURE';
     const checkinStatus = checkinDoc ? 'inserted checkin' : 'did not checkin';
     console.log(`${checkinResult}: ${checkinStatus} into database`);
@@ -204,7 +208,7 @@ const canAuthRecentlyUpdated = async() => {
     await fs.rm(TEST_PATH, { recursive: true });
     // Recursive option to be deprecated? No promise/async fs.rm? Confusing
   }
-}
+};
 
 // fresh db start for integration test
 const cleanUpDb = async () => {
@@ -217,7 +221,7 @@ const cleanUpDb = async () => {
     try {
       await promises[i];
     } catch (error) {
-      if(error !== 'MongoError: ns not found'){
+      if (error !== 'MongoError: ns not found') {
         console.log(`cleanUpDb => ${error}`);
       }
     }

@@ -1,13 +1,12 @@
 const { request } = require('https');
 const logger = require('../logger.js');
-const DEFAULT_POST = process.env.STATUS_CAKE_KEY || ''
+const DEFAULT_POST = process.env.STATUS_CAKE_KEY || '';
 
 // non-functional: Putting this in here to remind us to set up a heartbeat
 
-
 const pingStatusCake = (apiInfo = DEFAULT_POST) => {
-  return new Promise((resolve) => {
-    if(!apiInfo){
+  return new Promise(resolve => {
+    if (!apiInfo) {
       return;
     }
     const postData = apiInfo;
@@ -37,4 +36,4 @@ const pingStatusCake = (apiInfo = DEFAULT_POST) => {
 
 module.exports = {
   pingStatusCake,
-}
+};
