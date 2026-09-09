@@ -130,9 +130,11 @@ const run = async () => {
   // Open the reader immediately so cached cards continue to work while an
   // unavailable MongoDB deployment waits for server selection to time out.
   const serialReady = serialInit(authorize);
-  await Promise.all([serialReady, cronUpdate(false)]);
-  // Regular database check that updates local cache
+  const initialRefresh = cronUpdate(false);
+  // Schedule future refreshes independently of serial readiness. A disconnected
+  // reader must not prevent membership updates from reaching the local cache.
   cronTimer = setTimeout(cronUpdate, HOUR);
+  await Promise.all([serialReady, initialRefresh]);
   process.send?.('ready');
 };
 

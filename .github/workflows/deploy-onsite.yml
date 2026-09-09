@@ -77,13 +77,28 @@ jobs:
             (*[!0-9a-f]*|'') echo "Invalid deployment revision: $revision" >&2; exit 2 ;;
           esac
           git fetch --no-tags origin "$revision"
-          git reset --hard "$revision"
-          test "$(git rev-parse HEAD)" = "$revision"
-          cd onsite_auth_server
+
+          validation_dir=$(mktemp -d)
+          cleanup_validation() {
+            cd "$repository"
+            git worktree remove --force "$validation_dir" >/dev/null 2>&1 || true
+            rm -rf "$validation_dir"
+          }
+          trap cleanup_validation EXIT
+          git worktree add --detach "$validation_dir" "$revision"
+          cd "$validation_dir/onsite_auth_server"
           test "$(node --version | cut -d. -f1 | tr -d v)" -eq 24
           test "$(npm --version | cut -d. -f1)" -eq 11
           npm ci
           npm test
+
+          cleanup_validation
+          trap - EXIT
+          cd "$repository"
+          git reset --hard "$revision"
+          test "$(git rev-parse HEAD)" = "$revision"
+          cd onsite_auth_server
+          npm ci
           set -a
           . ./prod.sh
           set +a
