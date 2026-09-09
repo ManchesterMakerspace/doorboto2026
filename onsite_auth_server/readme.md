@@ -93,9 +93,10 @@ acceptance test and are intentionally not stored in this repository.
 Every push to `master` runs the unit tests, ESLint, and Prettier check in GitHub
 Actions using Node 24 and npm 11. After those checks pass, the protected
 `onsite-production` environment connects to the onsite host over SSH, resets
-its existing `master` checkout to `origin/master`, performs another locked
-install and unit-test run on the target architecture, restarts Doorboto with
-the current environment, saves the PM2 process list, and checks its status.
+its existing checkout to the exact commit that passed CI and environment
+approval, performs another locked install and unit-test run on the target
+architecture, restarts Doorboto with the current environment, saves the PM2
+process list, and checks its status.
 
 Configure these GitHub environment secrets:
 

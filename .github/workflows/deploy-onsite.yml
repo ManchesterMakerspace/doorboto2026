@@ -62,15 +62,23 @@ jobs:
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
           DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_REVISION: ${{ github.sha }}
         run: |
           port="${DEPLOY_PORT:-22}"
           printf -v quoted_path '%q' "$DEPLOY_PATH"
-          ssh -p "$port" "$DEPLOY_USER@$DEPLOY_HOST" "bash -se -- $quoted_path" <<'REMOTE'
+          printf -v quoted_revision '%q' "$DEPLOY_REVISION"
+          ssh -p "$port" "$DEPLOY_USER@$DEPLOY_HOST" "bash -se -- $quoted_path $quoted_revision" <<'REMOTE'
           repository=$1
+          revision=$2
           cd "$repository"
           test "$(git branch --show-current)" = master
-          git fetch --prune origin master
-          git reset --hard origin/master
+          test "${#revision}" -eq 40
+          case "$revision" in
+            (*[!0-9a-f]*|'') echo "Invalid deployment revision: $revision" >&2; exit 2 ;;
+          esac
+          git fetch --no-tags origin "$revision"
+          git reset --hard "$revision"
+          test "$(git rev-parse HEAD)" = "$revision"
           cd onsite_auth_server
           test "$(node --version | cut -d. -f1 | tr -d v)" -eq 24
           test "$(npm --version | cut -d. -f1)" -eq 11
