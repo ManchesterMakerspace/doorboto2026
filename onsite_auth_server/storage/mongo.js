@@ -5,6 +5,16 @@ const logger = require('../logger.js');
 const MONGODB_URI = process.env.MONGODB_URI;
 const DB_NAME = process.env.DB_NAME;
 const clients = new Set();
+
+const closeMongoClient = async client => {
+  if (!client) return;
+  try {
+    await client.close();
+  } finally {
+    clients.delete(client);
+  }
+};
+
 const connectDB = async () => {
   const returnObj = {
     db: null,
@@ -29,8 +39,7 @@ const connectDB = async () => {
       { event: 'mongodb.connect.error', err: error },
       'MongoDB connection failed'
     );
-    await client.close();
-    clients.delete(client);
+    await closeMongoClient(client);
     return returnObj;
   }
 };
@@ -58,15 +67,13 @@ const makeRecordOfScanFunc = (db, client) => {
     try {
       await db.collection(collection).insertOne(insertDoc(data));
     } finally {
-      await client.close();
-      clients.delete(client);
+      await closeMongoClient(client);
     }
   };
 };
 
 const closeMongoConnections = async () => {
-  await Promise.allSettled([...clients].map(client => client.close()));
-  clients.clear();
+  await Promise.allSettled([...clients].map(closeMongoClient));
 };
 
 // takes a card and returns an insert function
@@ -90,5 +97,6 @@ module.exports = {
   insertDoc,
   getCardFromDb,
   makeRecordOfScanFunc,
+  closeMongoClient,
   closeMongoConnections,
 };

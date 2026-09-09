@@ -19,6 +19,13 @@ sudo apt-get install -y nodejs
 # Install exactly the project-local dependencies recorded in package-lock.json.
 npm ci
 npm exec -- pm2 --version
+
+# Load the same host-local production settings used by `npm start` before PM2
+# snapshots the application environment for this run and system startup.
+set -a
+# shellcheck source=/dev/null
+. ./prod.sh
+set +a
 npm exec -- pm2 start ecosystem.config.js --update-env
 npm exec -- pm2 save
 

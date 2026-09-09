@@ -1,5 +1,6 @@
 // doorboto.mjs ~ Copyright 2020 Manchester Makerspace ~ License MIT
 const {
+  closeMongoClient,
   closeMongoConnections,
   connectDB,
   getCardFromDb,
@@ -95,8 +96,12 @@ const authorize = async (uid, giveAccess) => {
 
 // runs a time based update operation
 const cronUpdate = async (recurse = true) => {
+  let client = null;
   try {
-    const { db, client } = await connectDB();
+    const connection = await connectDB();
+    const { db } = connection;
+    client = connection.client;
+    if (!db) return;
     const cursor = db.collection('cards').find({});
     let card;
     while ((card = await cursor.next())) {
@@ -105,25 +110,27 @@ const cronUpdate = async (recurse = true) => {
         await updateCard(card);
       }
     }
-    await client?.close();
   } catch (error) {
     logger.error(
       { event: 'cache.refresh.error', err: error },
       'Cache refresh failed'
     );
-  }
-  // make upcoming expiration check every interval
-  if (recurse) {
-    cronTimer = setTimeout(cronUpdate, HOUR);
+  } finally {
+    await closeMongoClient(client);
+    // make upcoming expiration check every interval
+    if (recurse) {
+      cronTimer = setTimeout(cronUpdate, HOUR);
+    }
   }
 };
 
 // High level start up sequence
 const run = async () => {
   await cacheSetup('./members/');
-  await cronUpdate(false);
-  // Pass arduino connection function a callback to handle on data events
-  await serialInit(authorize);
+  // Open the reader immediately so cached cards continue to work while an
+  // unavailable MongoDB deployment waits for server selection to time out.
+  const serialReady = serialInit(authorize);
+  await Promise.all([serialReady, cronUpdate(false)]);
   // Regular database check that updates local cache
   cronTimer = setTimeout(cronUpdate, HOUR);
   process.send?.('ready');
